@@ -1,0 +1,1321 @@
+add_edit.php
+<?php
+require 'db.php';
+session_start();
+
+// Проверяем, что пользователь авторизован
+if (!isset($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
+
+if (!isset($_GET['table']) || !isset($_GET['action'])) {
+    die("Не указаны параметры.");
+}
+
+$table = $_GET['table'];
+$action = $_GET['action'];
+
+// Проверяем, что таблица разрешена
+$allowed_tables = [];
+$stmt = $pdo->query("SELECT table_name FROM table_metadata");
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $allowed_tables[] = $row['table_name'];
+}
+$allowed_tables[] = 'users'; // добавляем таблицу пользователей
+
+if (!in_array($table, $allowed_tables)) {
+    die("Недопустимая таблица.");
+}
+
+if ($action === 'add') {
+    // Исключаем 'id' из списка полей
+    $fields = array_keys($_POST);
+    if (($key = array_search('id', $fields)) !== false) {
+        unset($fields[$key]);
+    }
+    $values = [];
+    foreach ($fields as $field) {
+        $value = $_POST[$field];
+        // Хешируем пароль для пользователей
+        if ($table == 'users' && $field == 'password') {
+            $value = password_hash($value, PASSWORD_DEFAULT);
+        }
+        $values[] = $value;
+    }
+    $placeholders = implode(",", array_fill(0, count($values), "?"));
+    $field_list = implode(",", $fields);
+    $stmt = $pdo->prepare("INSERT INTO `$table` ($field_list) VALUES ($placeholders)");
+    $stmt->execute($values);
+} elseif ($action === 'edit') {
+    if (!isset($_POST['id'])) {
+        die("Не указан идентификатор записи.");
+    }
+    $id = (int)$_POST['id'];
+
+    // Запрещаем редактировать первую запись в таблице пользователей
+    if ($table === 'users' && $id === 1) {
+        die("Нельзя редактировать первую запись в таблице пользователей.");
+    }
+
+    // Исключаем 'id' из списка обновляемых полей
+    $fields = [];
+    $values = [];
+    foreach ($_POST as $field => $value) {
+        if ($field != 'id') {
+            // Хешируем пароль при редактировании пользователя
+            if ($table == 'users' && $field == 'password') {
+                $value = password_hash($value, PASSWORD_DEFAULT);
+            }
+            $fields[] = "`$field` = ?";
+            $values[] = $value;
+        }
+    }
+    $values[] = $id; // Добавляем id для WHERE
+    $field_list = implode(",", $fields);
+    $stmt = $pdo->prepare("UPDATE `$table` SET $field_list WHERE id = ?");
+    $stmt->execute($values);
+} else {
+    die("Недопустимое действие.");
+}
+
+header("Location: index.php?table=$table");
+exit;
+?>
+
+
+add_table.php
+<?php
+require 'db.php';
+session_start();
+
+// Проверяем, что пользователь авторизован
+if (!isset($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
+
+if (!isset($_POST['table_name']) || !isset($_POST['display_table_name'])) {
+    die("Необходимо указать имя таблицы и отображаемое имя таблицы.");
+}
+
+$table_name = $_POST['table_name'];
+$display_table_name = $_POST['display_table_name'];
+
+// Проверка имени таблицы
+if (!preg_match('/^[a-zA-Z0-9_]+$/', $table_name)) {
+    die("Недопустимое имя таблицы.");
+}
+
+// Проверяем, существует ли таблица
+$stmt = $pdo->prepare("SHOW TABLES LIKE ?");
+$stmt->execute([$table_name]);
+if ($stmt->rowCount() > 0) {
+    die("Таблица уже существует.");
+}
+
+// Получаем структуру таблицы-шаблона (building_1)
+$stmt = $pdo->query("SHOW CREATE TABLE building_1");
+$row = $stmt->fetch(PDO::FETCH_ASSOC);
+$create_table_sql = $row['Create Table'];
+
+// Заменяем имя таблицы
+$create_table_sql = str_replace('`building_1`', "`$table_name`", $create_table_sql);
+
+// Создаем новую таблицу
+$pdo->exec($create_table_sql);
+
+// Добавляем запись в table_metadata
+$stmt = $pdo->prepare("INSERT INTO table_metadata (table_name, display_table_name) VALUES (?, ?)");
+$stmt->execute([$table_name, $display_table_name]);
+
+// Получаем колонки из building_1 для метаданных
+$stmt = $pdo->prepare("SELECT column_name, display_column_name FROM column_metadata WHERE table_name = ?");
+$stmt->execute(['building_1']);
+$columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Добавляем колонки в column_metadata для новой таблицы
+foreach ($columns as $column) {
+    $stmt = $pdo->prepare("INSERT INTO column_metadata (table_name, column_name, display_column_name) VALUES (?, ?, ?)");
+    $stmt->execute([$table_name, $column['column_name'], $column['display_column_name']]);
+}
+
+header("Location: index.php?table=$table_name");
+exit;
+?>
+
+
+confirm_delete_table.php
+<?php
+session_start();
+require 'db.php';
+
+// Включаем отображение ошибок для отладки (можно отключить в продакшене)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+if (!isset($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
+
+if (!isset($_GET['table'])) {
+    die('Таблица не указана.');
+}
+
+$table = $_GET['table'];
+
+// Запрещаем удалять таблицу пользователей
+if ($table == 'users') {
+    die('Нельзя удалить таблицу пользователей.');
+}
+
+// Проверяем, что таблица существует
+$stmt = $pdo->prepare("SELECT display_table_name FROM table_metadata WHERE table_name = ?");
+$stmt->execute([$table]);
+$row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$row) {
+    die('Таблица не найдена.');
+}
+
+$display_table_name = $row['display_table_name'];
+
+// Обработка отправки формы
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (isset($_POST['cancel'])) {
+        header('Location: index.php?table=' . urlencode($table));
+        exit;
+    }
+
+    $password = $_POST['password'];
+
+    // Проверяем пароль пользователя
+    $stmt = $pdo->prepare("SELECT password FROM users WHERE username = ?");
+    $stmt->execute([$_SESSION['user']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user && password_verify($password, $user['password'])) {
+        try {
+            // Начинаем транзакцию
+            $pdo->beginTransaction();
+
+            // Удаляем таблицу
+            $pdo->exec("DROP TABLE IF EXISTS `$table`");
+
+            // Удаляем метаданные
+            $stmt = $pdo->prepare("DELETE FROM column_metadata WHERE table_name = ?");
+            $stmt->execute([$table]);
+            $stmt = $pdo->prepare("DELETE FROM table_metadata WHERE table_name = ?");
+            $stmt->execute([$table]);
+
+            // Подтверждаем транзакцию
+            $pdo->commit();
+        } catch (Exception $e) {
+            // Откатываем транзакцию в случае ошибки
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            // Здесь можно добавить логирование ошибки, если необходимо
+            // error_log("Ошибка при удалении таблицы: " . $e->getMessage());
+        } finally {
+            // Перенаправляем на index.php в любом случае
+            header('Location: index.php');
+            exit;
+        }
+    } else {
+        $error = 'Неверный пароль.';
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Подтверждение удаления таблицы</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="confirmation">
+        <div class="warning">
+            <h2 style="color: red;">Вы удаляете таблицу <?= htmlspecialchars($display_table_name) ?></h2>
+            <p>Эта операция необратима. Для подтверждения введите ваш пароль.</p>
+            <?php if (isset($error)): ?>
+                <p style="color: red;"><?= htmlspecialchars($error) ?></p>
+            <?php endif; ?>
+            <form method="post">
+                <label>Пароль: <input type="password" name="password" required></label><br>
+                <button type="submit">Удалить таблицу</button>
+                <button type="submit" name="cancel">Отмена</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+
+
+create_admin.php
+<?php
+require 'db.php';
+
+// Создание пользователя 'admin'
+$username = 'admin';
+$password = '5tR0Ng3s7pAsSwOr9';
+
+// Хешируем пароль
+$hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+// Проверяем, существует ли пользователь
+$stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
+$stmt->execute([$username]);
+if ($stmt->rowCount() > 0) {
+    echo "Пользователь уже существует.<br>";
+} else {
+    $stmt = $pdo->prepare("INSERT INTO users (id, username, password) VALUES (1, ?, ?)");
+    $stmt->execute([$username, $hashed_password]);
+    echo "Пользователь 'admin' создан.<br>";
+}
+
+// Создание первой таблицы с данными здания
+$table_name = 'building_1';
+$display_table_name = 'Здание 1';
+
+// Проверяем, существует ли таблица
+$stmt = $pdo->prepare("SHOW TABLES LIKE ?");
+$stmt->execute([$table_name]);
+if ($stmt->rowCount() > 0) {
+    echo "Таблица '$table_name' уже существует.<br>";
+} else {
+    // Создаем структуру таблицы
+    $create_table_sql = "
+    CREATE TABLE `$table_name` (
+        `id` INT NOT NULL AUTO_INCREMENT,
+        `floor` VARCHAR(50) NOT NULL,
+        `ip_number` VARCHAR(50) NOT NULL,
+        `name` VARCHAR(100) NOT NULL,
+        `landline_number` VARCHAR(50) NOT NULL,
+        PRIMARY KEY (`id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ";
+
+    $pdo->exec($create_table_sql);
+    echo "Таблица '$table_name' создана.<br>";
+
+    // Добавляем запись в table_metadata
+    $stmt = $pdo->prepare("INSERT INTO table_metadata (table_name, display_table_name) VALUES (?, ?)");
+    $stmt->execute([$table_name, $display_table_name]);
+    echo "Метаданные для таблицы '$table_name' добавлены.<br>";
+
+    // Добавляем колонки в column_metadata
+    $columns = [
+        ['column_name' => 'id', 'display_column_name' => 'ID'],
+        ['column_name' => 'floor', 'display_column_name' => 'Этаж'],
+        ['column_name' => 'ip_number', 'display_column_name' => 'IP номер'],
+        ['column_name' => 'name', 'display_column_name' => 'Название'],
+        ['column_name' => 'landline_number', 'display_column_name' => 'Городской номер'],
+    ];
+
+    foreach ($columns as $column) {
+        $stmt = $pdo->prepare("INSERT INTO column_metadata (table_name, column_name, display_column_name) VALUES (?, ?, ?)");
+        $stmt->execute([$table_name, $column['column_name'], $column['display_column_name']]);
+    }
+    echo "Метаданные колонок для таблицы '$table_name' добавлены.<br>";
+}
+
+echo "Установка завершена.";
+?>
+
+
+db.php
+<?php
+$host = 'localhost';
+$dbname = 'phone_directory';
+$username = 'root';  // замените на имя пользователя MySQL
+$password = 'root';  // замените на пароль MySQL
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Ошибка подключения: " . $e->getMessage());
+}
+?>
+
+
+delete.php
+<?php
+require 'db.php';
+session_start();
+
+// Проверяем, что пользователь авторизован
+if (!isset($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
+
+if (!isset($_GET['table']) || !isset($_GET['id'])) {
+    die("Не указаны параметры.");
+}
+
+$table = $_GET['table'];
+$id = (int)$_GET['id'];
+
+// Проверяем, что таблица разрешена
+$allowed_tables = [];
+$stmt = $pdo->query("SELECT table_name FROM table_metadata");
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $allowed_tables[] = $row['table_name'];
+}
+$allowed_tables[] = 'users'; // добавляем таблицу пользователей
+
+if (!in_array($table, $allowed_tables)) {
+    die("Недопустимая таблица.");
+}
+
+
+
+// Запрещаем удаление первой записи в таблице пользователей
+if ($table === 'users' && $id === 1) {
+    die("Нельзя удалить первую запись в таблице пользователей.");
+}
+
+$stmt = $pdo->prepare("DELETE FROM `$table` WHERE id = ?");
+$stmt->execute([$id]);
+
+header("Location: index.php?table=$table");
+exit;
+?>
+
+
+get_quick_info.php
+<?php
+require 'db.php';
+
+$stmt = $pdo->query("SELECT content FROM quick_info LIMIT 1");
+if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    echo $row['content'];
+} else {
+    echo '';
+}
+?>
+
+
+get_record.php
+<?php
+require 'db.php';
+
+if (!isset($_GET['table']) || !isset($_GET['id'])) {
+    die("Не указаны параметры.");
+}
+
+$table = $_GET['table'];
+$id = $_GET['id'];
+
+// Проверяем, что таблица разрешена
+$allowed_tables = [];
+$stmt = $pdo->query("SELECT table_name FROM table_metadata");
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $allowed_tables[] = $row['table_name'];
+}
+$allowed_tables[] = 'users'; // добавляем таблицу пользователей
+
+if (!in_array($table, $allowed_tables)) {
+    die("Недопустимая таблица.");
+}
+
+$stmt = $pdo->prepare("SELECT * FROM `$table` WHERE id = ?");
+$stmt->execute([$id]);
+$record = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$record) {
+    die("Запись не найдена.");
+}
+
+// Убираем поле 'password' из записи при редактировании пользователя
+if ($table == 'users') {
+    unset($record['password']);
+}
+
+echo json_encode($record);
+?>
+
+
+index.php
+<?php
+session_start();
+require 'db.php';
+
+// Check if users table exists
+try {
+    $stmt = $pdo->query("SELECT 1 FROM users LIMIT 1");
+} catch (Exception $e) {
+    // Create users table
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(255) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+}
+
+// Check if there is at least one user
+$stmt = $pdo->query("SELECT COUNT(*) FROM users");
+$user_count = $stmt->fetchColumn();
+
+if ($user_count == 0) {
+    // No users exist, display form to create admin user
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username'], $_POST['password'])) {
+        $username = $_POST['username'];
+        $password = $_POST['password'];
+
+        // Hash the password
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+        // Insert admin user with id = 1
+        $stmt = $pdo->prepare("INSERT INTO users (id, username, password) VALUES (1, ?, ?)");
+        $stmt->execute([$username, $hashed_password]);
+
+        $_SESSION['user'] = $username;
+        header("Location: index.php");
+        exit();
+    }
+
+    // Display form to create admin user
+    ?>
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <title>Создание администратора</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+    <div class="container">
+        <h1>Создание администратора</h1>
+        <form method="post">
+            <label>Имя пользователя: <input type="text" name="username" required></label><br>
+            <label>Пароль: <input type="password" name="password" required></label><br>
+            <button type="submit">Создать администратора</button>
+        </form>
+    </div>
+    </body>
+    </html>
+    <?php
+    exit();
+}
+
+// Check if necessary tables exist, create if not
+$requiredTables = ['table_metadata', 'column_metadata', 'quick_info', 'templates', 'template_columns'];
+foreach ($requiredTables as $table) {
+    try {
+        $stmt = $pdo->query("SELECT 1 FROM $table LIMIT 1");
+    } catch (Exception $e) {
+        switch ($table) {
+            case 'table_metadata':
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS table_metadata (
+                        table_name VARCHAR(255) PRIMARY KEY,
+                        display_table_name VARCHAR(255) NOT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                ");
+                break;
+            case 'column_metadata':
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS column_metadata (
+                        table_name VARCHAR(255) NOT NULL,
+                        column_name VARCHAR(255) NOT NULL,
+                        display_column_name VARCHAR(255) NOT NULL,
+                        PRIMARY KEY (table_name, column_name)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                ");
+                break;
+            case 'quick_info':
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS quick_info (
+                        id INT PRIMARY KEY DEFAULT 1,
+                        content TEXT
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                ");
+                break;
+            case 'templates':
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS templates (
+                        template_name VARCHAR(255) PRIMARY KEY,
+                        display_template_name VARCHAR(255) NOT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                ");
+                break;
+            case 'template_columns':
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS template_columns (
+                        template_name VARCHAR(255) NOT NULL,
+                        column_name VARCHAR(255) NOT NULL,
+                        data_type VARCHAR(255) NOT NULL,
+                        display_column_name VARCHAR(255) NOT NULL,
+                        PRIMARY KEY (template_name, column_name)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                ");
+                break;
+        }
+    }
+}
+
+// Get list of tables and their display names
+$tables = [];
+$stmt = $pdo->query("SELECT table_name, display_table_name FROM table_metadata");
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $tables[$row['table_name']] = $row['display_table_name'];
+}
+
+// If user is logged in, add 'users' table for admin
+if (isset($_SESSION['user'])) {
+    $tables['users'] = 'Пользователи';
+}
+
+// Determine current table
+$current_table = isset($_GET['table']) ? $_GET['table'] : null;
+
+// If there are no tables
+if (empty($tables)) {
+    if (isset($_SESSION['user'])) {
+        // User is logged in, display options to create a new table
+        ?>
+        <!DOCTYPE html>
+        <html lang="ru">
+        <head>
+            <meta charset="UTF-8">
+            <title>Телефонный справочник</title>
+            <link rel="stylesheet" href="style.css">
+        </head>
+        <body data-current-table="">
+            <div class="container">
+                <!-- Sidebar -->
+                <aside class="sidebar">
+                    <h2>Адресная книга</h2>
+                    <p>Вы вошли как <?= htmlspecialchars($_SESSION['user']) ?>. <a href="logout.php">Выйти</a></p>
+                    <nav>
+                        <p>Нет доступных таблиц. Создайте новую таблицу.</p>
+                    </nav>
+                    <button class="btn" id="addTableBtn">Добавить таблицу</button>
+                </aside>
+                <!-- Main content -->
+                <main>
+                    <!-- Quick info block -->
+                    <div class="quick-info">
+                        <h2>Информация</h2>
+                        <p id="quickInfoText"></p>
+                        <?php if (isset($_SESSION['user'])): ?>
+                            <button id="editQuickInfoBtn">Редактировать информацию</button>
+                        <?php endif; ?>
+                    </div>
+                </main>
+            </div>
+
+            <!-- Modals -->
+            <!-- Include your modal code here -->
+
+            <script src="script.js"></script>
+        </body>
+        </html>
+        <?php
+        exit();
+    } else {
+        // User is not logged in, suggest logging in
+        ?>
+        <!DOCTYPE html>
+        <html lang="ru">
+        <head>
+            <meta charset="UTF-8">
+            <title>Телефонный справочник</title>
+            <link rel="stylesheet" href="style.css">
+        </head>
+        <body>
+            <div class="container">
+                <p>Нет доступных таблиц. Пожалуйста, <a href="#" id="loginBtn">войдите</a> для создания новой таблицы.</p>
+            </div>
+
+            <!-- Login Modal -->
+            <!-- Include your login modal code here -->
+
+            <script src="script.js"></script>
+        </body>
+        </html>
+        <?php
+        exit();
+    }
+}
+
+// Fetch quick_info content
+$stmt = $pdo->query("SELECT content FROM quick_info WHERE id = 1");
+$quick_info = $stmt->fetchColumn();
+
+if (!$quick_info) {
+    $quick_info = '';
+}
+
+// Function to parse custom markup
+function parseCustomMarkup($text) {
+    // Escape HTML special characters
+    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+
+    // Handle <br> tags
+    $text = str_replace('&lt;br&gt;', '<br>', $text);
+
+    // Handle <h1> and <h2> tags
+    $text = preg_replace('/&lt;h([12])&gt;(.*?)&lt;\/h\1&gt;/', '<h$1>$2</h$1>', $text);
+
+    // Handle <color:colorname>...</color>
+    $text = preg_replace_callback('/&lt;color:(.*?)&gt;(.*?)&lt;\/color&gt;/s', function($matches) {
+        $color = htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8');
+        $content = $matches[2];
+        return '<span style="color:' . $color . '">' . $content . '</span>';
+    }, $text);
+
+    return $text;
+}
+
+$quick_info_html = parseCustomMarkup($quick_info);
+
+// Get columns for current table
+$columns = [];
+
+if ($current_table == 'users') {
+    $columns = [
+        'id' => 'ID',
+        'username' => 'Имя пользователя',
+        'password' => 'Пароль (хешированный)'
+    ];
+} else {
+    $stmt = $pdo->prepare("SELECT column_name, display_column_name FROM column_metadata WHERE table_name = ?");
+    $stmt->execute([$current_table]);
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $columns[$row['column_name']] = $row['display_column_name'];
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Телефонный справочник</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-current-table="<?= htmlspecialchars($current_table) ?>">
+<div class="container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2>Адресная книга</h2>
+        <?php if (isset($_SESSION['user'])): ?>
+            <p>Вы вошли как <?= htmlspecialchars($_SESSION['user']) ?>. <a href="logout.php">Выйти</a></p>
+        <?php else: ?>
+            <p><a href="#" id="loginBtn">Войти</a> для редактирования записей.</p>
+        <?php endif; ?>
+        <nav>
+            <?php foreach ($tables as $table => $display_name): ?>
+                <a href="?table=<?= htmlspecialchars($table) ?>" class="nav-item <?= $current_table == $table ? 'active' : '' ?>">
+                    <?= htmlspecialchars($display_name) ?>
+                </a>
+            <?php endforeach; ?>
+        </nav>
+        <?php if (isset($_SESSION['user'])): ?>
+            <?php if ($current_table != 'users'): ?>
+                <button class="btn deleteTableBtn">Удалить таблицу</button>
+            <?php endif; ?>
+            <button class="btn" id="addTableBtn">Добавить таблицу</button>
+            <button class="btn" id="addBtn">Добавить запись</button>
+        <?php endif; ?>
+    </aside>
+
+    <!-- Main content -->
+    <main>
+        <!-- Quick info block -->
+        <div class="quick-info">
+            <h2>Информация</h2>
+            <p id="quickInfoText"><?= $quick_info_html ?></p>
+            <?php if (isset($_SESSION['user'])): ?>
+                <button id="editQuickInfoBtn">Редактировать информацию</button>
+            <?php endif; ?>
+        </div>
+
+        <h1>Телефонный справочник: <?= htmlspecialchars($tables[$current_table]) ?></h1>
+
+        <!-- Search input -->
+        <input type="text" id="searchInput" placeholder="Поиск...">
+
+        <table>
+            <thead>
+                <tr>
+                    <?php foreach ($columns as $col => $display_col): ?>
+                        <th><?= htmlspecialchars($display_col) ?><div class="resizer"></div></th>
+                    <?php endforeach; ?>
+                    <?php if (isset($_SESSION['user'])): ?>
+                        <th>Действия</th>
+                    <?php endif; ?>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $stmt = $pdo->query("SELECT * FROM `$current_table`");
+                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)):
+                ?>
+                    <tr>
+                        <?php foreach ($columns as $col => $display_col): ?>
+                            <td><?= htmlspecialchars($row[$col]) ?></td>
+                        <?php endforeach; ?>
+                        <?php if (isset($_SESSION['user'])): ?>
+                            <td>
+                                <?php
+                                $disable_edit = false;
+                                $disable_delete = false;
+
+                                if ($current_table == 'users' && $row['id'] == 1) {
+                                    $disable_edit = true;
+                                    $disable_delete = true;
+                                }
+                                ?>
+                                <?php if (!$disable_edit): ?>
+                                    <button class="editBtn" data-id="<?= $row['id'] ?>">Редактировать</button>
+                                <?php endif; ?>
+                                <?php if (!$disable_delete): ?>
+                                    <button class="deleteBtn" data-id="<?= $row['id'] ?>">Удалить</button>
+                                <?php endif; ?>
+                            </td>
+                        <?php endif; ?>
+                    </tr>
+                <?php endwhile; ?>
+            </tbody>
+        </table>
+    </main>
+</div>
+
+<!-- Modals -->
+<!-- Quick Info Modal -->
+<div id="quickInfoModal" class="modal">
+    <div class="modal-content">
+        <span class="close quickInfo-close">&times;</span>
+        <h2>Редактировать информацию</h2>
+        <div class="modal-body">
+            <form id="quickInfoForm" method="post" action="update_quick_info.php">
+                <textarea name="content" id="quickInfoContent" rows="5" required></textarea><br>
+                <button type="submit">Сохранить</button>
+            </form>
+            <div class="markup-help">
+                <h3>Доступные функции:</h3>
+                <ul>
+                    <li>Заголовок 1: <code>&lt;h1&gt;Текст&lt;/h1&gt;</code></li>
+                    <li>Заголовок 2: <code>&lt;h2&gt;Текст&lt;/h2&gt;</code></li>
+                    <li>Цветной текст: <code>&lt;color:цвет&gt;Текст&lt;/color&gt;</code></li>
+                    <li>Перенос строки: <code>&lt;br&gt;</code></li>
+                </ul>
+                <h3>Примеры:</h3>
+                <p><code>&lt;h1&gt;Большой заголовок&lt;/h1&gt;</code> будет отображаться как:</p>
+                <h1>Большой заголовок</h1>
+                <p><code>&lt;color:red&gt;Красный текст&lt;/color&gt;</code> будет отображаться как:</p>
+                <span style="color:red;">Красный текст</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Table Modal -->
+<div id="tableModal" class="modal">
+    <div class="modal-content">
+        <span class="close table-close">&times;</span>
+        <h2>Добавить новое здание</h2>
+        <form id="tableForm" method="post" action="add_table.php">
+            <label>Отображаемое имя таблицы: <input type="text" name="display_table_name" required></label><br>
+            <label>Имя таблицы (латиницей): <input type="text" name="table_name" required></label><br>
+            <label>Выберите шаблон:
+                <select name="template_name" id="templateSelect">
+                    <option value="">-- Выберите шаблон --</option>
+                    <?php
+                    $stmt = $pdo->query("SELECT template_name, display_template_name FROM templates");
+                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)):
+                    ?>
+                        <option value="<?= htmlspecialchars($row['template_name']) ?>"><?= htmlspecialchars($row['display_template_name']) ?></option>
+                    <?php endwhile; ?>
+                </select>
+            </label><br>
+            <button type="button" id="createTemplateBtn">Создать новый шаблон</button><br>
+            <button type="submit">Создать таблицу</button>
+        </form>
+    </div>
+</div>
+
+<!-- Template Modal -->
+<div id="templateModal" class="modal">
+    <div class="modal-content">
+        <span class="close template-close">&times;</span>
+        <h2>Создать новый шаблон</h2>
+        <form id="templateForm" method="post" action="add_template.php">
+            <label>Имя шаблона (латиницей): <input type="text" name="template_name" required></label><br>
+            <label>Отображаемое имя шаблона: <input type="text" name="display_template_name" required></label><br>
+            <div id="columnsContainer">
+                <h3>Колонки:</h3>
+                <button type="button" id="addColumnBtn">Добавить колонку</button>
+            </div>
+            <button type="submit">Создать шаблон</button>
+        </form>
+    </div>
+</div>
+
+<!-- Login Modal -->
+<div id="loginModal" class="modal">
+    <div class="modal-content">
+        <span class="close login-close">&times;</span>
+        <h2>Вход</h2>
+        <form method="post" action="login.php">
+            <label>Имя пользователя: <input type="text" name="username" required></label><br>
+            <label>Пароль: <input type="password" name="password" required></label><br>
+            <button type="submit">Войти</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add/Edit Record Modal -->
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2 id="modalTitle">Добавить запись</h2>
+        <form id="modalForm" method="post">
+            <input type="hidden" name="id" id="recordId">
+            <?php foreach ($columns as $col => $display_col): ?>
+                <?php if ($col != 'id'): ?>
+                    <label><?= htmlspecialchars($display_col) ?>:
+                        <?php if ($current_table == 'users' && $col == 'password'): ?>
+                            <input type="password" name="<?= $col ?>" required>
+                        <?php else: ?>
+                            <input type="text" name="<?= $col ?>" required>
+                        <?php endif; ?>
+                    </label><br>
+                <?php endif; ?>
+            <?php endforeach; ?>
+            <button type="submit">Сохранить</button>
+        </form>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
+
+
+
+login.php
+<?php
+session_start();
+require 'db.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = $_POST['username'];
+    $password = $_POST['password']; // Получаем введенный пароль
+
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = :username");
+    $stmt->execute(['username' => $username]);
+
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user && password_verify($password, $user['password'])) {
+        $_SESSION['user'] = $username;
+        header("Location: index.php");
+        exit();
+    } else {
+        $error = "Неверное имя пользователя или пароль.";
+        $_SESSION['error'] = $error;
+        header("Location: index.php");
+        exit();
+    }
+}
+?>
+
+
+logout.php
+<?php
+session_start();
+session_destroy();
+header("Location: index.php");
+exit();
+?>
+
+
+script.js
+document.addEventListener("DOMContentLoaded", () => {
+    const modal = document.getElementById("modal");
+    const addBtn = document.getElementById("addBtn");
+    const closeBtns = document.querySelectorAll(".close");
+    const editButtons = document.querySelectorAll(".editBtn");
+    const deleteButtons = document.querySelectorAll(".deleteBtn");
+    const modalForm = document.getElementById("modalForm");
+    const tableModal = document.getElementById("tableModal");
+    const addTableBtn = document.getElementById("addTableBtn");
+    const tableCloseBtn = document.querySelector(".table-close");
+    const deleteTableBtn = document.querySelector('.deleteTableBtn');
+    const current_table = document.body.getAttribute('data-current-table');
+    const searchInput = document.getElementById('searchInput');
+    const loginModal = document.getElementById('loginModal');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginCloseBtn = document.querySelector('.login-close');
+    const quickInfoModal = document.getElementById('quickInfoModal');
+    const quickInfoForm = document.getElementById('quickInfoForm');
+    const editQuickInfoBtn = document.getElementById('editQuickInfoBtn');
+    const quickInfoCloseBtn = document.querySelector('.quickInfo-close');
+
+    // Открытие модального окна для добавления записи
+    if (addBtn) {
+        addBtn.onclick = () => {
+            document.getElementById("modalTitle").innerText = "Добавить запись";
+            modalForm.reset();
+            modal.style.display = "flex";
+            modalForm.action = "add_edit.php?action=add&table=" + current_table;
+        };
+    }
+
+    // Открытие модального окна для редактирования записи
+    editButtons.forEach(button => {
+        button.onclick = () => {
+            const id = button.getAttribute("data-id");
+            document.getElementById("modalTitle").innerText = "Редактировать запись";
+            modal.style.display = "flex";
+            modalForm.action = "add_edit.php?action=edit&table=" + current_table;
+            fetch('get_record.php?table=' + current_table + '&id=' + id)
+                .then(response => response.json())
+                .then(data => {
+                    for (let key in data) {
+                        if (modalForm.elements[key]) {
+                            modalForm.elements[key].value = data[key];
+                        }
+                    }
+                });
+        };
+    });
+
+    // Закрытие модальных окон
+    closeBtns.forEach(btn => {
+        btn.onclick = () => {
+            btn.parentElement.parentElement.style.display = "none";
+        };
+    });
+
+    // Удаление записи
+    deleteButtons.forEach(button => {
+        button.onclick = () => {
+            const id = button.getAttribute("data-id");
+            if (confirm("Вы уверены, что хотите удалить запись?")) {
+                window.location.href = "delete.php?table=" + current_table + "&id=" + id;
+            }
+        };
+    });
+
+    // Открытие модального окна для добавления таблицы
+    if (addTableBtn) {
+        addTableBtn.onclick = () => {
+            tableModal.style.display = "flex";
+        };
+    }
+
+    // Обработчик для кнопки удаления таблицы
+    if (deleteTableBtn) {
+        deleteTableBtn.onclick = () => {
+            if (confirm('Вы точно хотите удалить таблицу?')) {
+                // Перенаправляем на страницу подтверждения удаления
+                window.location.href = 'confirm_delete_table.php?table=' + current_table;
+            }
+        };
+    }
+
+    // Закрытие модальных окон при клике вне их
+    window.onclick = (event) => {
+        if (event.target === modal) {
+            modal.style.display = "none";
+        }
+        if (event.target === tableModal) {
+            tableModal.style.display = "none";
+        }
+        if (event.target === quickInfoModal) {
+            quickInfoModal.style.display = "none";
+        }
+        if (event.target === loginModal) {
+            loginModal.style.display = "none";
+        }
+    };
+
+    // Функционал поиска
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            const filter = searchInput.value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr');
+
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                let match = false;
+
+                cells.forEach(cell => {
+                    if (cell.textContent.toLowerCase().includes(filter)) {
+                        match = true;
+                    }
+                });
+
+                row.style.display = match ? '' : 'none';
+            });
+        });
+    }
+
+    // Модальное окно быстрого информационного блока
+    if (editQuickInfoBtn) {
+        editQuickInfoBtn.addEventListener('click', () => {
+            quickInfoModal.style.display = 'flex';
+            // Получаем текущее содержимое
+            fetch('get_quick_info.php')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('quickInfoContent').value = data;
+                });
+        });
+    }
+
+    if (quickInfoCloseBtn) {
+        quickInfoCloseBtn.addEventListener('click', () => {
+            quickInfoModal.style.display = 'none';
+        });
+    }
+
+    // Открытие модального окна входа
+    if (loginBtn) {
+        loginBtn.onclick = () => {
+            loginModal.style.display = 'flex';
+        };
+    }
+
+    if (loginCloseBtn) {
+        loginCloseBtn.onclick = () => {
+            loginModal.style.display = 'none';
+        };
+    }
+
+    // Resizable columns
+    function makeColumnsResizable(table) {
+        const cols = table.querySelectorAll('th');
+        const tableHeight = table.offsetHeight;
+
+        cols.forEach((col) => {
+            const resizer = col.querySelector('.resizer');
+            if (resizer) {
+                resizer.addEventListener('mousedown', initResize);
+            }
+
+            let startX, startWidth;
+
+            function initResize(e) {
+                startX = e.pageX;
+                startWidth = col.offsetWidth;
+                document.documentElement.addEventListener('mousemove', doResize);
+                document.documentElement.addEventListener('mouseup', stopResize);
+            }
+
+            function doResize(e) {
+                const width = startWidth + e.pageX - startX;
+                col.style.width = width + 'px';
+            }
+
+            function stopResize() {
+                document.documentElement.removeEventListener('mousemove', doResize);
+                document.documentElement.removeEventListener('mouseup', stopResize);
+            }
+        });
+    }
+
+    // Make columns resizable
+    const table = document.querySelector('table');
+    if (table) {
+        makeColumnsResizable(table);
+    }
+});
+
+
+style.css
+body {
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    display: flex;
+}
+
+.sidebar {
+    width: 200px;
+    background-color: #f4f4f4;
+    padding: 20px;
+}
+
+.sidebar h2 {
+    color: #2E7D32;
+}
+
+.nav-item {
+    display: block;
+    margin: 10px 0;
+    color: #333;
+    text-decoration: none;
+}
+
+.nav-item.active {
+    font-weight: bold;
+}
+
+.btn {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.main {
+    flex-grow: 1;
+    padding: 20px;
+}
+
+.quick-info {
+    background-color: #e7f3fe;
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+.quick-info h2 {
+    margin-top: 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    table-layout: fixed;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+    overflow: hidden;
+    word-wrap: break-word;
+}
+
+th {
+    position: relative;
+}
+
+.resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5px;
+    cursor: col-resize;
+    user-select: none;
+}
+
+#searchInput {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 5px;
+    width: 400px;
+    position: relative;
+}
+
+.close {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    cursor: pointer;
+}
+
+.confirmation {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.warning {
+    border: 1px solid red;
+    padding: 20px;
+    background-color: #ffe6e6;
+}
+
+.editBtn, .deleteBtn {
+    padding: 5px 10px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+.editBtn {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+}
+
+.deleteBtn {
+    background-color: #f44336;
+    color: white;
+    border: none;
+}
+
+
+update_quick_info.php
+<?php
+session_start();
+require 'db.php';
+
+if (!isset($_SESSION['user'])) {
+    die("Доступ запрещен.");
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $content = $_POST['content'];
+
+    // Проверяем, есть ли запись в quick_info
+    $stmt = $pdo->query("SELECT * FROM quick_info");
+    if ($stmt->rowCount() > 0) {
+        // Обновляем существующую запись
+        $stmt = $pdo->prepare("UPDATE quick_info SET content = ? WHERE id = 1");
+        $stmt->execute([$content]);
+    } else {
+        // Вставляем новую запись
+        $stmt = $pdo->prepare("INSERT INTO quick_info (id, content) VALUES (1, ?)");
+        $stmt->execute([$content]);
+    }
+
+    header("Location: index.php");
+    exit;
+}
+?>
+
+Вот список задач для улучшения этого кода:
+Свой мини код для заметок сверху страницы(по типу <color:red>этот текст красный</color><br><h1>этот текст большой</h1><br><color:red><h2>Этот текст красный и чуть поменьше чем большой</h2></color>) с блоком справа модального окна для перечисления всех доступных функций и примерами.(Код:<h1>Большой текст</h1>; на странице: Большой текст(ну тут просто как оно будет отображаться))
+
+Код для создание таблиц по шаблону существующей(на выбор из всех уникальных шаблонов), либо по форме создания таблицы(с обработкой всех лимитов данных и предотвращением ввода некорректных(типа как просто заполнение таблицы в phpmyadmin)) и создания шаблона этой таблицы
+
+Убрать хардкод несуществующей таблицей и убрать хардкод при создании первого пользователя чтобы было проще при миграции и в дальнейшем. При отсутствии таблиц не выводить ошибку а предлагать войти в аккаунт админа, а затем создать новую таблицу по шаблону или создать новый шаблон. Если админа нету то предлагать создать нового(обязательно создавать его с id 1, чтобы его нельзя было удалить через сайт).
+
+Все эти функции делать через модальные окна
