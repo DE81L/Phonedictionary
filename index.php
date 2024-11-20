@@ -211,6 +211,7 @@ if (!$quick_info) {
     $quick_info = '';
 }
 
+// Function to parse custom markup
 function parseCustomMarkup($text) {
     // Escape HTML special characters
     $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
@@ -378,10 +379,10 @@ if ($current_table == 'users') {
 <div id="tableModal" class="modal">
     <div class="modal-content">
         <span class="close table-close">&times;</span>
-        <h2>Добавить новую таблицу</h2>
+        <h2>Добавить новое здание</h2>
         <form id="tableForm" method="post" action="add_table.php">
-            <label>Имя таблицы (латиницей): <input type="text" name="table_name" required></label><br>
             <label>Отображаемое имя таблицы: <input type="text" name="display_table_name" required></label><br>
+            <label>Имя таблицы (латиницей): <input type="text" name="table_name" required></label><br>
             <label>Выберите шаблон:
                 <select name="template_name" id="templateSelect">
                     <option value="">-- Выберите шаблон --</option>
@@ -393,16 +394,7 @@ if ($current_table == 'users') {
                     <?php endwhile; ?>
                 </select>
             </label><br>
-            <div id="columnsContainer" style="display: none;">
-                <h3>Колонки:</h3>
-                <button type="button" id="addColumnBtn">Добавить колонку</button>
-                <!-- Columns will be added here dynamically -->
-            </div>
-            <div id="templateDetails" style="display: none;">
-                <label>Имя шаблона (латиницей): <input type="text" name="new_template_name"></label><br>
-                <label>Отображаемое имя шаблона: <input type="text" name="new_display_template_name"></label><br>
-                <label><input type="checkbox" name="create_template"> Создать шаблон на основе этой таблицы</label><br>
-            </div>
+            <button type="button" id="createTemplateBtn">Создать новый шаблон</button><br>
             <button type="submit">Создать таблицу</button>
         </form>
     </div>
