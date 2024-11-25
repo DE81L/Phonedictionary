@@ -2,52 +2,47 @@
 require 'db.php';
 session_start();
 
-// Проверяем, что пользователь авторизован
 if (!isset($_SESSION['user'])) {
     header('Location: login.php');
     exit;
 }
 
-if (!isset($_POST['table_name']) || !isset($_POST['display_table_name'])) {
-    die("Необходимо указать имя таблицы и отображаемое имя таблицы.");
+
+if (!isset($_POST['display_table_name']) || !isset($_POST['template_name'])) {
+    die("Необходимо указать отображаемое имя таблицы и выбрать шаблон.");
 }
 
-$table_name = $_POST['table_name'];
 $display_table_name = $_POST['display_table_name'];
+$template_name = $_POST['template_name'];
 
-// Проверка имени таблицы
-if (!preg_match('/^[a-zA-Z0-9_]+$/', $table_name)) {
-    die("Недопустимое имя таблицы.");
-}
+$table_name = 'building_1';
 
-// Проверяем, существует ли таблица
 $stmt = $pdo->prepare("SHOW TABLES LIKE ?");
 $stmt->execute([$table_name]);
 if ($stmt->rowCount() > 0) {
-    die("Таблица уже существует.");
+    die("Таблица с именем '$table_name' уже существует.");
 }
 
-// Получаем структуру таблицы-шаблона (building_1)
-$stmt = $pdo->query("SHOW CREATE TABLE building_1");
-$row = $stmt->fetch(PDO::FETCH_ASSOC);
-$create_table_sql = $row['Create Table'];
+$stmt = $pdo->prepare("SELECT column_name, data_type, display_column_name FROM template_columns WHERE template_name = ?");
+$stmt->execute([$template_name]);
+$columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Заменяем имя таблицы
-$create_table_sql = str_replace('`building_1`', "`$table_name`", $create_table_sql);
+if (empty($columns)) {
+    die("Выбранный шаблон не содержит колонок.");
+}
 
-// Создаем новую таблицу
+$columns_sql = [];
+foreach ($columns as $column) {
+    $columns_sql[] = "`{$column['column_name']}` {$column['data_type']} NOT NULL";
+}
+$columns_sql[] = "`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY";
+$create_table_sql = "CREATE TABLE `$table_name` (" . implode(", ", $columns_sql) . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+
 $pdo->exec($create_table_sql);
 
-// Добавляем запись в table_metadata
 $stmt = $pdo->prepare("INSERT INTO table_metadata (table_name, display_table_name) VALUES (?, ?)");
 $stmt->execute([$table_name, $display_table_name]);
 
-// Получаем колонки из building_1 для метаданных
-$stmt = $pdo->prepare("SELECT column_name, display_column_name FROM column_metadata WHERE table_name = ?");
-$stmt->execute(['building_1']);
-$columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Добавляем колонки в column_metadata для новой таблицы
 foreach ($columns as $column) {
     $stmt = $pdo->prepare("INSERT INTO column_metadata (table_name, column_name, display_column_name) VALUES (?, ?, ?)");
     $stmt->execute([$table_name, $column['column_name'], $column['display_column_name']]);
