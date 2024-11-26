@@ -23,6 +23,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const templateCloseBtn = document.querySelector(".template-close");
     const addColumnBtn = document.getElementById("addColumnBtn");
     const columnsContainer = document.getElementById("columnsContainer");
+    const createAdminModal = document.getElementById('createAdminModal');
+    const createAdminForm = document.getElementById('createAdminForm');
+
+    if (createAdminModal) {
+        createAdminModal.style.display = 'flex';
+    }
 
     if (createTemplateBtn) {
         createTemplateBtn.addEventListener('click', () => {
@@ -137,6 +143,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (event.target === loginModal) {
             loginModal.style.display = "none";
+        }
+        if (event.target === createAdminModal) {
+            createAdminModal.style.display = "none";
         }
     };
 

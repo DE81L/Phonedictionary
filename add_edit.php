@@ -74,3 +74,4 @@ if ($action === 'add') {
 
 header("Location: index.php?table=$table");
 exit;
+?>
