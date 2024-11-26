@@ -78,9 +78,10 @@ $stmt->execute([$table_name, $display_table_name]);
 foreach ($columns as $column) {
     $column_name = $column['column_name'];
     $display_column_name = $column['display_column_name'];
+    $data_type = $column['data_type'];
 
-    $stmt = $pdo->prepare("INSERT INTO column_metadata (table_name, column_name, display_column_name) VALUES (?, ?, ?)");
-    $stmt->execute([$table_name, $column_name, $display_column_name]);
+    $stmt = $pdo->prepare("INSERT INTO column_metadata (table_name, column_name, display_column_name, data_type) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$table_name, $column_name, $display_column_name, $data_type]);
 }
 
 header("Location: index.php?table=$table_name");

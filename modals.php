@@ -57,6 +57,7 @@
         <h2>Редактировать информацию</h2>
         <div class="modal-body">
             <form id="quickInfoForm" method="post" action="update_quick_info.php">
+                <input type="hidden" name="current_table" value="<?= htmlspecialchars($current_table ?? '') ?>">
                 <textarea name="content" id="quickInfoContent" rows="5" required></textarea><br>
                 <button type="submit">Сохранить</button>
             </form>
@@ -71,6 +72,7 @@
                     <li>Заголовок 6: <code>&lt;h6&gt;Текст&lt;/h6&gt;</code></li>
                     <li>Цветной текст: <code>&lt;color:цвет&gt;Текст&lt;/color&gt;</code> (цвет может быть названием или HEX кодом)</li>
                     <li>Перенос строки: <code>&lt;br&gt;</code></li>
+                    <li>Изменение размера текста: <code>&lt;s:размер&gt;Текст&lt;/s&gt;</code> (размер в пикселях)</li>
                 </ul>
                 <h3>Примеры:</h3>
                 <p><code>&lt;h1&gt;Большой заголовок&lt;/h1&gt;</code> будет отображаться как:</p>

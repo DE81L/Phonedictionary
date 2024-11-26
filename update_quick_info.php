@@ -8,6 +8,7 @@ if (!isset($_SESSION['user'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $content = $_POST['content'];
+    $current_table = $_POST['current_table'] ?? '';
 
     $stmt = $pdo->query("SELECT * FROM quick_info");
     if ($stmt->rowCount() > 0) {
@@ -18,7 +19,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$content]);
     }
 
-    header("Location: index.php");
+    // Redirect back to index.php, including the current table if provided
+    if (!empty($current_table)) {
+        header("Location: index.php?table=" . urlencode($current_table));
+    } else {
+        header("Location: index.php");
+    }
     exit;
 }
 ?>

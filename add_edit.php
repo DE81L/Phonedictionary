@@ -29,8 +29,8 @@ if (!in_array($table, $allowed_tables)) {
 $columns = [];
 if ($table == 'users') {
     $columns = [
-        'username' => ['type' => 'string', 'required' => true],
-        'password' => ['type' => 'string', 'required' => true],
+        'username' => ['type' => 'VARCHAR(255)', 'required' => true],
+        'password' => ['type' => 'VARCHAR(255)', 'required' => true],
     ];
 } else {
     $stmt = $pdo->prepare("SELECT column_name, data_type FROM column_metadata WHERE table_name = ?");
@@ -41,14 +41,17 @@ if ($table == 'users') {
 }
 
 function validate_input($value, $type) {
-    if ($type == 'INT') {
+    if (strpos($type, 'INT') !== false) {
         return ctype_digit($value);
     } elseif ($type == 'DATE') {
-        return strtotime($value) !== false;
+        return (bool)strtotime($value);
     } elseif ($type == 'DATETIME') {
-        return strtotime($value) !== false;
-    } else {
+        return (bool)strtotime($value);
+    } elseif (strpos($type, 'VARCHAR') !== false || $type == 'TEXT') {
         return !empty($value);
+    } else {
+        // For any other types, accept the value as is
+        return true;
     }
 }
 

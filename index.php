@@ -82,8 +82,16 @@ function parseCustomMarkup($text) {
         }
     }, $text);
 
+    // Replace size tags
+    $text = preg_replace_callback('/&lt;s:(\d+)&gt;(.*?)&lt;\/s&gt;/s', function($matches) {
+        $size = intval($matches[1]);
+        $content = $matches[2];
+        return '<span style="font-size:' . $size . 'px">' . $content . '</span>';
+    }, $text);
+
     return $text;
 }
+
 
 $quick_info_html = parseCustomMarkup($quick_info);
 
