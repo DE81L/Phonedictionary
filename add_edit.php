@@ -25,19 +25,53 @@ if (!in_array($table, $allowed_tables)) {
     die("Недопустимая таблица.");
 }
 
-if ($action === 'add') {
-    $fields = array_keys($_POST);
-    if (($key = array_search('id', $fields)) !== false) {
-        unset($fields[$key]);
+// Get columns for the table
+$columns = [];
+if ($table == 'users') {
+    $columns = [
+        'username' => ['type' => 'string', 'required' => true],
+        'password' => ['type' => 'string', 'required' => true],
+    ];
+} else {
+    $stmt = $pdo->prepare("SELECT column_name, data_type FROM column_metadata WHERE table_name = ?");
+    $stmt->execute([$table]);
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $columns[$row['column_name']] = ['type' => $row['data_type'], 'required' => true];
     }
+}
+
+function validate_input($value, $type) {
+    if ($type == 'INT') {
+        return ctype_digit($value);
+    } elseif ($type == 'DATE') {
+        return strtotime($value) !== false;
+    } elseif ($type == 'DATETIME') {
+        return strtotime($value) !== false;
+    } else {
+        return !empty($value);
+    }
+}
+
+if ($action === 'add') {
+    $fields = [];
     $values = [];
-    foreach ($fields as $field) {
+    foreach ($columns as $field => $meta) {
+        if (!isset($_POST[$field])) {
+            die("Поле '$field' не заполнено.");
+        }
         $value = $_POST[$field];
+
+        if (!validate_input($value, $meta['type'])) {
+            die("Неверное значение для поля '$field'.");
+        }
+
+        $fields[] = $field;
         if ($table == 'users' && $field == 'password') {
             $value = password_hash($value, PASSWORD_DEFAULT);
         }
         $values[] = $value;
     }
+
     $placeholders = implode(",", array_fill(0, count($values), "?"));
     $field_list = implode(",", $fields);
     $stmt = $pdo->prepare("INSERT INTO `$table` ($field_list) VALUES ($placeholders)");
@@ -54,15 +88,21 @@ if ($action === 'add') {
 
     $fields = [];
     $values = [];
-    foreach ($_POST as $field => $value) {
-        if ($field != 'id') {
-
-            if ($table == 'users' && $field == 'password') {
-                $value = password_hash($value, PASSWORD_DEFAULT);
-            }
-            $fields[] = "`$field` = ?";
-            $values[] = $value;
+    foreach ($columns as $field => $meta) {
+        if (!isset($_POST[$field])) {
+            die("Поле '$field' не заполнено.");
         }
+        $value = $_POST[$field];
+
+        if (!validate_input($value, $meta['type'])) {
+            die("Неверное значение для поля '$field'.");
+        }
+
+        if ($table == 'users' && $field == 'password') {
+            $value = password_hash($value, PASSWORD_DEFAULT);
+        }
+        $fields[] = "`$field` = ?";
+        $values[] = $value;
     }
     $values[] = $id;
     $field_list = implode(",", $fields);
@@ -75,3 +115,4 @@ if ($action === 'add') {
 header("Location: index.php?table=$table");
 exit;
 ?>
+<p><a href="index.php">Вернуться на главную страницу</a></p>

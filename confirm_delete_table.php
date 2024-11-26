@@ -88,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <button type="submit">Удалить таблицу</button>
                 <button type="submit" name="cancel">Отмена</button>
             </form>
+            <p><a href="index.php">Вернуться на главную страницу</a></p>
         </div>
     </div>
 </body>

@@ -22,3 +22,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
+<p><a href="index.php">Вернуться на главную страницу</a></p>

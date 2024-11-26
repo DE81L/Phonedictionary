@@ -46,12 +46,12 @@ document.addEventListener("DOMContentLoaded", () => {
         addColumnBtn.onclick = () => {
             const columnDiv = document.createElement("div");
             columnDiv.classList.add("column-entry");
-
+    
             columnDiv.innerHTML = `
-                <label>Имя колонки (латиницей): <input type="text" name="columns[][column_name]" required></label><br>
-                <label>Отображаемое имя колонки: <input type="text" name="columns[][display_column_name]" required></label><br>
+                <label>Имя колонки (латиницей): <input type="text" name="columns[${Date.now()}][column_name]" required></label><br>
+                <label>Отображаемое имя колонки: <input type="text" name="columns[${Date.now()}][display_column_name]" required></label><br>
                 <label>Тип данных:
-                    <select name="columns[][data_type]" required>
+                    <select name="columns[${Date.now()}][data_type]" required>
                         <option value="VARCHAR(255)">VARCHAR(255)</option>
                         <option value="INT">INT</option>
                         <option value="TEXT">TEXT</option>
@@ -62,16 +62,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 <button type="button" class="removeColumnBtn">Удалить колонку</button>
                 <hr>
             `;
-
+    
             columnsContainer.appendChild(columnDiv);
-
+    
             const removeBtn = columnDiv.querySelector(".removeColumnBtn");
             removeBtn.onclick = () => {
                 columnsContainer.removeChild(columnDiv);
             };
         };
     }
-
+    
     if (addBtn) {
         addBtn.onclick = () => {
             document.getElementById("modalTitle").innerText = "Добавить запись";
