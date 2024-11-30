@@ -123,12 +123,14 @@ if ($current_table && isset($tables[$current_table])) {
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
     />
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-current-table="<?= htmlspecialchars($current_table ?? '') ?>">
 <div class="container-fluid">
     <div class="row">
-        <aside class="col-md-2 bg-light sidebar p-3">
+        <aside class="col-md-3 bg-light sidebar p-3">
             <h2 class="text-success">Адресная книга</h2>
             <?php if (isset($_SESSION['user'])): ?>
                 <p>Вы вошли как <?= htmlspecialchars($_SESSION['user']) ?>. <a href="logout.php">Выйти</a></p>
@@ -158,8 +160,8 @@ if ($current_table && isset($tables[$current_table])) {
             <?php endif; ?>
         </aside>
 
-        <main class="col-md-10">
-            <div class="quick-info p-3 mb-4 bg-info text-white rounded">
+        <main class="col-md-9">
+            <div class="quick-info p-3 mb-4 rounded">
                 <h2>Информация</h2>
                 <p id="quickInfoText"><?= $quick_info_html ?></p>
                 <?php if (isset($_SESSION['user'])): ?>
@@ -204,12 +206,18 @@ if ($current_table && isset($tables[$current_table])) {
                                                 $disable_delete = true;
                                             }
                                             ?>
-                                            <?php if (!$disable_edit): ?>
-                                                <button class="btn btn-sm btn-warning editBtn" data-id="<?= $row['id'] ?>">Редактировать</button>
-                                            <?php endif; ?>
-                                            <?php if (!$disable_delete): ?>
-                                                <button class="btn btn-sm btn-danger deleteBtn" data-id="<?= $row['id'] ?>">Удалить</button>
-                                            <?php endif; ?>
+                                            <div class="btn-group" role="group" aria-label="Действия">
+                                                <?php if (!$disable_edit): ?>
+                                                    <button class="btn btn-sm btn-warning editBtn action-btn" data-id="<?= $row['id'] ?>">
+                                                        <i class="bi bi-pencil-square"></i>
+                                                    </button>
+                                                <?php endif; ?>
+                                                <?php if (!$disable_delete): ?>
+                                                    <button class="btn btn-sm btn-danger deleteBtn action-btn" data-id="<?= $row['id'] ?>">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
                                     <?php endif; ?>
                                 </tr>

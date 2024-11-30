@@ -96,8 +96,23 @@
                         <textarea name="content" id="quickInfoContent" class="form-control" rows="5" required></textarea>
                     </div>
                     <button type="submit" class="btn btn-success">Сохранить</button>
+                    <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#examplesModal">Показать примеры</button>
                 </form>
-                <div class="markup-help mt-4">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Examples Modal -->
+<div id="examplesModal" class="modal fade" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5>Примеры</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div class="markup-help">
                     <h5>Доступные функции:</h5>
                     <ul>
                         <li>Заголовок 1: <code>&lt;h1&gt;Текст&lt;/h1&gt;</code></li>
