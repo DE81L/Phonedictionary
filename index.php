@@ -92,7 +92,6 @@ function parseCustomMarkup($text) {
     return $text;
 }
 
-
 $quick_info_html = parseCustomMarkup($quick_info);
 
 // Fetch columns for current table
@@ -113,114 +112,129 @@ if ($current_table && isset($tables[$current_table])) {
         }
     }
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <title>Телефонный справочник</title>
+    <!-- Bootstrap CSS -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-current-table="<?= htmlspecialchars($current_table ?? '') ?>">
-<div class="container">
-    <aside class="sidebar">
-        <h2>Адресная книга</h2>
-        <?php if (isset($_SESSION['user'])): ?>
-            <p>Вы вошли как <?= htmlspecialchars($_SESSION['user']) ?>. <a href="logout.php">Выйти</a></p>
-        <?php else: ?>
-            <p><a href="#" id="loginBtn">Войти</a> для редактирования записей.</p>
-        <?php endif; ?>
-        <nav>
-            <?php if (!empty($tables)): ?>
-                <?php foreach ($tables as $table => $display_name): ?>
-                    <a href="?table=<?= htmlspecialchars($table) ?>" class="nav-item <?= $current_table == $table ? 'active' : '' ?>">
-                        <?= htmlspecialchars($display_name) ?>
-                    </a>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <p>Нет доступных таблиц. Создайте новую таблицу или шаблон.</p>
-            <?php endif; ?>
-        </nav>
-        <?php if (isset($_SESSION['user'])): ?>
-            <?php if ($current_table && $current_table != 'users'): ?>
-                <button class="btn deleteTableBtn">Удалить таблицу</button>
-            <?php endif; ?>
-            <button class="btn" id="addTableBtn">Создать таблицу по шаблону</button>
-            <button class="btn" id="createTemplateBtn">Создать новый шаблон</button>
-            <?php if ($current_table): ?>
-                <button class="btn" id="addBtn">Добавить запись</button>
-            <?php endif; ?>
-        <?php endif; ?>
-    </aside>
-
-    <main>
-        <div class="quick-info">
-            <h2>Информация</h2>
-            <p id="quickInfoText"><?= $quick_info_html ?></p>
+<div class="container-fluid">
+    <div class="row">
+        <aside class="col-md-2 bg-light sidebar p-3">
+            <h2 class="text-success">Адресная книга</h2>
             <?php if (isset($_SESSION['user'])): ?>
-                <button id="editQuickInfoBtn">Редактировать информацию</button>
+                <p>Вы вошли как <?= htmlspecialchars($_SESSION['user']) ?>. <a href="logout.php">Выйти</a></p>
+            <?php else: ?>
+                <p><a href="#" id="loginBtn">Войти</a> для редактирования записей.</p>
             <?php endif; ?>
-        </div>
+            <nav class="nav flex-column">
+                <?php if (!empty($tables)): ?>
+                    <?php foreach ($tables as $table => $display_name): ?>
+                        <a href="?table=<?= htmlspecialchars($table) ?>" class="nav-link <?= $current_table == $table ? 'active' : '' ?>">
+                            <?= htmlspecialchars($display_name) ?>
+                        </a>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p>Нет доступных таблиц. Создайте новую таблицу или шаблон.</p>
+                <?php endif; ?>
+            </nav>
+            <?php if (isset($_SESSION['user'])): ?>
+                <?php if ($current_table && $current_table != 'users'): ?>
+                    <button class="btn btn-danger w-100 mt-2 deleteTableBtn">Удалить таблицу</button>
+                <?php endif; ?>
+                <button class="btn btn-primary w-100 mt-2" id="addTableBtn">Создать таблицу по шаблону</button>
+                <button class="btn btn-secondary w-100 mt-2" id="createTemplateBtn">Создать новый шаблон</button>
+                <?php if ($current_table): ?>
+                    <button class="btn btn-success w-100 mt-2" id="addBtn">Добавить запись</button>
+                <?php endif; ?>
+            <?php endif; ?>
+        </aside>
 
-        <?php if ($current_table && isset($tables[$current_table])): ?>
-            <h1>Телефонный справочник: <?= htmlspecialchars($tables[$current_table]) ?></h1>
+        <main class="col-md-10">
+            <div class="quick-info p-3 mb-4 bg-info text-white rounded">
+                <h2>Информация</h2>
+                <p id="quickInfoText"><?= $quick_info_html ?></p>
+                <?php if (isset($_SESSION['user'])): ?>
+                    <button class="btn btn-light" id="editQuickInfoBtn">Редактировать информацию</button>
+                <?php endif; ?>
+            </div>
 
-            <input type="text" id="searchInput" placeholder="Поиск...">
+            <?php if ($current_table && isset($tables[$current_table])): ?>
+                <h1>Телефонный справочник: <?= htmlspecialchars($tables[$current_table]) ?></h1>
 
-            <table>
-                <thead>
-                    <tr>
-                        <?php foreach ($columns as $col => $display_col): ?>
-                            <th><?= htmlspecialchars($display_col) ?><div class="resizer"></div></th>
-                        <?php endforeach; ?>
-                        <?php if (isset($_SESSION['user'])): ?>
-                            <th>Действия</th>
-                        <?php endif; ?>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    $stmt = $pdo->query("SELECT * FROM `$current_table`");
-                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)):
-                    ?>
-                        <tr>
-                            <?php foreach ($columns as $col => $display_col): ?>
-                                <td><?= htmlspecialchars($row[$col]) ?></td>
-                            <?php endforeach; ?>
-                            <?php if (isset($_SESSION['user'])): ?>
-                                <td>
-                                    <?php
-                                    $disable_edit = false;
-                                    $disable_delete = false;
+                <input type="text" id="searchInput" class="form-control mb-3" placeholder="Поиск...">
 
-                                    if ($current_table == 'users' && $row['id'] == 1) {
-                                        $disable_edit = true;
-                                        $disable_delete = true;
-                                    }
-                                    ?>
-                                    <?php if (!$disable_edit): ?>
-                                        <button class="editBtn" data-id="<?= $row['id'] ?>">Редактировать</button>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <?php foreach ($columns as $col => $display_col): ?>
+                                    <th><?= htmlspecialchars($display_col) ?><div class="resizer"></div></th>
+                                <?php endforeach; ?>
+                                <?php if (isset($_SESSION['user'])): ?>
+                                    <th>Действия</th>
+                                <?php endif; ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $stmt = $pdo->query("SELECT * FROM `$current_table`");
+                            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)):
+                            ?>
+                                <tr>
+                                    <?php foreach ($columns as $col => $display_col): ?>
+                                        <td><?= htmlspecialchars($row[$col]) ?></td>
+                                    <?php endforeach; ?>
+                                    <?php if (isset($_SESSION['user'])): ?>
+                                        <td>
+                                            <?php
+                                            $disable_edit = false;
+                                            $disable_delete = false;
+
+                                            if ($current_table == 'users' && $row['id'] == 1) {
+                                                $disable_edit = true;
+                                                $disable_delete = true;
+                                            }
+                                            ?>
+                                            <?php if (!$disable_edit): ?>
+                                                <button class="btn btn-sm btn-warning editBtn" data-id="<?= $row['id'] ?>">Редактировать</button>
+                                            <?php endif; ?>
+                                            <?php if (!$disable_delete): ?>
+                                                <button class="btn btn-sm btn-danger deleteBtn" data-id="<?= $row['id'] ?>">Удалить</button>
+                                            <?php endif; ?>
+                                        </td>
                                     <?php endif; ?>
-                                    <?php if (!$disable_delete): ?>
-                                        <button class="deleteBtn" data-id="<?= $row['id'] ?>">Удалить</button>
-                                    <?php endif; ?>
-                                </td>
-                            <?php endif; ?>
-                        </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
-        <?php else: ?>
-            <h1>Телефонный справочник</h1>
-            <p>Выберите таблицу из списка или создайте новую.</p>
-        <?php endif; ?>
-    </main>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <h1>Телефонный справочник</h1>
+                <p>Выберите таблицу из списка или создайте новую.</p>
+            <?php endif; ?>
+        </main>
+    </div>
 </div>
 
 <!-- Modals -->
 <?php include 'modals.php'; ?>
 
+<!-- Bootstrap JS and dependencies -->
+<script
+    src="https://code.jquery.com/jquery-3.6.0.min.js"
+></script>
+<script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+></script>
 <script src="script.js"></script>
 </body>
 </html>
