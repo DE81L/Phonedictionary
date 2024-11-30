@@ -7,7 +7,6 @@ if (!isset($_SESSION['user'])) {
     exit;
 }
 
-// Include a link back to index.php in case of errors
 function error_and_back($message) {
     echo '<p>' . htmlspecialchars($message) . '</p>';
     echo '<p><a href="index.php">Вернуться на главную страницу</a></p>';
@@ -63,11 +62,9 @@ foreach ($columns as $index => $column) {
     }
 }
 
-// Insert template into 'templates' table
 $stmt = $pdo->prepare("INSERT INTO templates (template_name, display_template_name) VALUES (?, ?)");
 $stmt->execute([$template_name, $display_template_name]);
 
-// Insert columns into 'template_columns' table
 foreach ($columns as $column) {
     $column_name = $column['column_name'];
     $data_type = $column['data_type'];

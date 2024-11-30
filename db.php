@@ -1,7 +1,7 @@
 <?php
 $host = 'localhost';
 $dbname = 'phone_directory';
-$username = 'root';  // Replace with your own credentials
+$username = 'root';  // Замените своими данными
 $password = 'root';
 
 ini_set('display_errors', 1);
@@ -12,11 +12,9 @@ try {
     $pdo = new PDO("mysql:host=$host;charset=utf8mb4", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Create database if it doesn't exist
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbname` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `$dbname`");
 
-    // Create necessary tables if they don't exist
     $requiredTables = ['users', 'table_metadata', 'column_metadata', 'quick_info', 'templates', 'template_columns'];
 
     foreach ($requiredTables as $table) {

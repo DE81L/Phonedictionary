@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const columnsContainer = document.getElementById("columnsContainer");
     const createAdminModal = document.getElementById('createAdminModal');
     const createAdminForm = document.getElementById('createAdminForm');
+    const examplesModal = document.getElementById('examplesModal');
+    const showExamplesBtn = document.getElementById('showExamplesBtn');
+    const examplesCloseBtn = document.querySelector('.examples-close');
 
     if (createAdminModal) {
         createAdminModal.style.display = 'flex';
@@ -32,13 +35,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (createTemplateBtn) {
         createTemplateBtn.addEventListener('click', () => {
-            templateModal.style.display = "flex";
+            templateModal.classList.add('show');
         });
     }
 
     if (templateCloseBtn) {
         templateCloseBtn.addEventListener('click', () => {
-            templateModal.style.display = "none";
+            templateModal.classList.remove('show');
         });
     }
 
@@ -78,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
         addBtn.onclick = () => {
             document.getElementById("modalTitle").innerText = "Добавить запись";
             modalForm.reset();
-            modal.style.display = "flex";
+            modal.classList.add('show');
             modalForm.action = "add_edit.php?action=add&table=" + current_table;
         };
     }
@@ -87,7 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
         button.onclick = () => {
             const id = button.getAttribute("data-id");
             document.getElementById("modalTitle").innerText = "Редактировать запись";
-            modal.style.display = "flex";
+            modal.classList.add('show');
             modalForm.action = "add_edit.php?action=edit&table=" + current_table;
             fetch('get_record.php?table=' + current_table + '&id=' + id)
                 .then(response => response.json())
@@ -103,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     closeBtns.forEach(btn => {
         btn.onclick = () => {
-            btn.parentElement.parentElement.style.display = "none";
+            btn.parentElement.parentElement.parentElement.classList.remove('show');
         };
     });
 
@@ -118,7 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (addTableBtn) {
         addTableBtn.onclick = () => {
-            tableModal.style.display = "flex";
+            tableModal.classList.add('show');
         };
     }
 
@@ -130,24 +133,39 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
+    if (showExamplesBtn) {
+        showExamplesBtn.addEventListener('click', () => {
+            examplesModal.classList.add('show');
+        });
+    }
+
+    if (examplesCloseBtn) {
+        examplesCloseBtn.addEventListener('click', () => {
+            examplesModal.classList.remove('show');
+        });
+    }
+
     window.onclick = (event) => {
         if (event.target === modal) {
-            modal.style.display = "none";
+            modal.classList.remove('show');
         }
         if (event.target === tableModal) {
-            tableModal.style.display = "none";
+            tableModal.classList.remove('show');
         }
         if (event.target === templateModal) {
-            templateModal.style.display = "none";
+            templateModal.classList.remove('show');
         }
         if (event.target === quickInfoModal) {
-            quickInfoModal.style.display = "none";
+            quickInfoModal.classList.remove('show');
         }
         if (event.target === loginModal) {
-            loginModal.style.display = "none";
+            loginModal.classList.remove('show');
         }
         if (event.target === createAdminModal) {
-            createAdminModal.style.display = "none";
+            createAdminModal.classList.remove('show');
+        }
+        if (event.target === examplesModal) {
+            examplesModal.classList.remove('show');
         }
     };
 
@@ -173,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (editQuickInfoBtn) {
         editQuickInfoBtn.addEventListener('click', () => {
-            quickInfoModal.style.display = 'flex';
+            quickInfoModal.classList.add('show');
             fetch('get_quick_info.php')
                 .then(response => response.text())
                 .then(data => {
@@ -184,19 +202,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (quickInfoCloseBtn) {
         quickInfoCloseBtn.addEventListener('click', () => {
-            quickInfoModal.style.display = 'none';
+            quickInfoModal.classList.remove('show');
         });
     }
 
     if (loginBtn) {
         loginBtn.onclick = () => {
-            loginModal.style.display = 'flex';
+            loginModal.classList.add('show');
         };
     }
 
     if (loginCloseBtn) {
         loginCloseBtn.onclick = () => {
-            loginModal.style.display = 'none';
+            loginModal.classList.remove('show');
         };
     }
 

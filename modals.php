@@ -1,5 +1,4 @@
 <?php if ($show_create_admin_modal): ?>
-<!-- Create Admin Modal -->
 <div id="createAdminModal" class="modal" tabindex="-1" style="display: block;">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -24,7 +23,6 @@
 </div>
 <?php endif; ?>
 
-<!-- Login Modal -->
 <div id="loginModal" class="modal" tabindex="-1" <?php if (!$show_create_admin_modal && !isset($_SESSION['user']) && empty($tables)) echo 'style="display: block;"'; ?>>
     <div class="modal-dialog">
         <div class="modal-content">
@@ -49,13 +47,12 @@
     </div>
 </div>
 
-<!-- Add/Edit Record Modal -->
 <div id="modal" class="modal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="modalTitle">Добавить запись</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                <button type="button" class="btn-close modal-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
                 <form id="modalForm" method="post">
@@ -81,13 +78,12 @@
     </div>
 </div>
 
-<!-- Quick Info Modal -->
 <div id="quickInfoModal" class="modal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5>Редактировать информацию</h5>
-                <button type="button" class="btn-close quickInfo-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                <button type="button" class="btn-close quickInfo-close" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
                 <form id="quickInfoForm" method="post" action="update_quick_info.php">
@@ -96,20 +92,19 @@
                         <textarea name="content" id="quickInfoContent" class="form-control" rows="5" required></textarea>
                     </div>
                     <button type="submit" class="btn btn-success">Сохранить</button>
-                    <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#examplesModal">Показать примеры</button>
+                    <button type="button" class="btn btn-info" id="showExamplesBtn">Показать примеры</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Examples Modal -->
-<div id="examplesModal" class="modal fade" tabindex="-1">
+<div id="examplesModal" class="modal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5>Примеры</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                <button type="button" class="btn-close examples-close" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
                 <div class="markup-help">
@@ -173,7 +168,6 @@
     </div>
 </div>
 
-<!-- Create Template Modal -->
 <div id="templateModal" class="modal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">

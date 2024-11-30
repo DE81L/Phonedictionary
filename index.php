@@ -2,7 +2,6 @@
 session_start();
 require 'db.php';
 
-// Check if standard template exists, create it if it doesn't
 $stmt = $pdo->prepare("SELECT * FROM templates WHERE template_name = 'standard_template'");
 $stmt->execute();
 $template_exists = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -24,34 +23,28 @@ if (!$template_exists) {
     }
 }
 
-// Check if admin exists
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = 1");
 $stmt->execute();
 $admin_exists = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Handle admin creation
 if (!$admin_exists) {
-    // If admin does not exist, show modal window to create admin
     $show_create_admin_modal = true;
 } else {
     $show_create_admin_modal = false;
 }
 
-// Fetch available tables
 $tables = [];
 $stmt = $pdo->query("SELECT table_name, display_table_name FROM table_metadata");
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $tables[$row['table_name']] = $row['display_table_name'];
 }
 
-// If user is logged in, add 'users' table to the list
 if (isset($_SESSION['user'])) {
     $tables['users'] = 'Пользователи';
 }
 
 $current_table = isset($_GET['table']) ? $_GET['table'] : null;
 
-// Fetch quick info content
 $stmt = $pdo->query("SELECT content FROM quick_info WHERE id = 1");
 $quick_info = $stmt->fetchColumn();
 
@@ -59,19 +52,15 @@ if (!$quick_info) {
     $quick_info = '';
 }
 
-// Function to parse custom markup
 function parseCustomMarkup($text) {
     $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 
-    // Replace <br> tags
     $text = str_replace('&lt;br&gt;', '<br>', $text);
 
-    // Replace header tags
     for ($i = 1; $i <= 6; $i++) {
         $text = preg_replace('/&lt;h' . $i . '&gt;(.*?)&lt;\/h' . $i . '&gt;/', '<h' . $i . '>$1</h' . $i . '>', $text);
     }
 
-    // Replace color tags
     $text = preg_replace_callback('/&lt;color:(.*?)&gt;(.*?)&lt;\/color&gt;/s', function($matches) {
         $color = htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8');
         $content = $matches[2];
@@ -82,7 +71,6 @@ function parseCustomMarkup($text) {
         }
     }, $text);
 
-    // Replace size tags
     $text = preg_replace_callback('/&lt;s:(\d+)&gt;(.*?)&lt;\/s&gt;/s', function($matches) {
         $size = intval($matches[1]);
         $content = $matches[2];
@@ -94,7 +82,6 @@ function parseCustomMarkup($text) {
 
 $quick_info_html = parseCustomMarkup($quick_info);
 
-// Fetch columns for current table
 $columns = [];
 
 if ($current_table && isset($tables[$current_table])) {
@@ -118,12 +105,10 @@ if ($current_table && isset($tables[$current_table])) {
 <head>
     <meta charset="UTF-8">
     <title>Телефонный справочник</title>
-    <!-- Bootstrap CSS -->
     <link
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
     />
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -140,7 +125,7 @@ if ($current_table && isset($tables[$current_table])) {
             <nav class="nav flex-column">
                 <?php if (!empty($tables)): ?>
                     <?php foreach ($tables as $table => $display_name): ?>
-                        <a href="?table=<?= htmlspecialchars($table) ?>" class="nav-link <?= $current_table == $table ? 'active' : '' ?>">
+                        <a href="?table=<?= htmlspecialchars($table) ?>" class="btn btn-table w-100 mb-2 <?= $current_table == $table ? 'active' : '' ?>">
                             <?= htmlspecialchars($display_name) ?>
                         </a>
                     <?php endforeach; ?>
@@ -155,7 +140,7 @@ if ($current_table && isset($tables[$current_table])) {
                 <button class="btn btn-primary w-100 mt-2" id="addTableBtn">Создать таблицу по шаблону</button>
                 <button class="btn btn-secondary w-100 mt-2" id="createTemplateBtn">Создать новый шаблон</button>
                 <?php if ($current_table): ?>
-                    <button class="btn btn-success w-100 mt-2" id="addBtn">Добавить запись</button>
+                    <button class="btn btn-add w-100 mt-2" id="addBtn">Добавить запись</button>
                 <?php endif; ?>
             <?php endif; ?>
         </aside>
@@ -208,12 +193,12 @@ if ($current_table && isset($tables[$current_table])) {
                                             ?>
                                             <div class="btn-group" role="group" aria-label="Действия">
                                                 <?php if (!$disable_edit): ?>
-                                                    <button class="btn btn-sm btn-warning editBtn action-btn" data-id="<?= $row['id'] ?>">
+                                                    <button class="btn btn-sm btn-edit editBtn action-btn" data-id="<?= $row['id'] ?>">
                                                         <i class="bi bi-pencil-square"></i>
                                                     </button>
                                                 <?php endif; ?>
                                                 <?php if (!$disable_delete): ?>
-                                                    <button class="btn btn-sm btn-danger deleteBtn action-btn" data-id="<?= $row['id'] ?>">
+                                                    <button class="btn btn-sm btn-delete deleteBtn action-btn" data-id="<?= $row['id'] ?>">
                                                         <i class="bi bi-trash"></i>
                                                     </button>
                                                 <?php endif; ?>
@@ -233,10 +218,8 @@ if ($current_table && isset($tables[$current_table])) {
     </div>
 </div>
 
-<!-- Modals -->
 <?php include 'modals.php'; ?>
 
-<!-- Bootstrap JS and dependencies -->
 <script
     src="https://code.jquery.com/jquery-3.6.0.min.js"
 ></script>

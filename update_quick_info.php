@@ -19,7 +19,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$content]);
     }
 
-    // Redirect back to index.php, including the current table if provided
     if (!empty($current_table)) {
         header("Location: index.php?table=" . urlencode($current_table));
     } else {

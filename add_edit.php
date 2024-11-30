@@ -25,7 +25,6 @@ if (!in_array($table, $allowed_tables)) {
     die("Недопустимая таблица.");
 }
 
-// Get columns for the table
 $columns = [];
 if ($table == 'users') {
     $columns = [
@@ -50,7 +49,6 @@ function validate_input($value, $type) {
     } elseif (strpos($type, 'VARCHAR') !== false || $type == 'TEXT') {
         return !empty($value);
     } else {
-        // For any other types, accept the value as is
         return true;
     }
 }
