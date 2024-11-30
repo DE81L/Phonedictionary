@@ -38,16 +38,17 @@ try {
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
                 ");
                 break;
-            case 'column_metadata':
-                $pdo->exec("
-                    CREATE TABLE IF NOT EXISTS column_metadata (
-                        table_name VARCHAR(255) NOT NULL,
-                        column_name VARCHAR(255) NOT NULL,
-                        display_column_name VARCHAR(255) NOT NULL,
-                        PRIMARY KEY (table_name, column_name)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-                ");
-                break;
+                case 'column_metadata':
+                    $pdo->exec("
+                        CREATE TABLE IF NOT EXISTS column_metadata (
+                            table_name VARCHAR(255) NOT NULL,
+                            column_name VARCHAR(255) NOT NULL,
+                            display_column_name VARCHAR(255) NOT NULL,
+                            data_type VARCHAR(255) NOT NULL,
+                            PRIMARY KEY (table_name, column_name)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                    ");
+                    break;                
             case 'quick_info':
                 $pdo->exec("
                     CREATE TABLE IF NOT EXISTS quick_info (

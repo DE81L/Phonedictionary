@@ -12,10 +12,10 @@ if (!$template_exists) {
         ->execute(['standard_template', 'Стандартный шаблон']);
 
     $columns = [
-        ['column_name' => 'floor', 'data_type' => 'VARCHAR(50)', 'display_column_name' => 'Этаж'],
-        ['column_name' => 'ip_number', 'data_type' => 'VARCHAR(50)', 'display_column_name' => 'IP номер'],
-        ['column_name' => 'name', 'data_type' => 'VARCHAR(100)', 'display_column_name' => 'Название'],
-        ['column_name' => 'landline_number', 'data_type' => 'VARCHAR(50)', 'display_column_name' => 'Городской номер'],
+        ['column_name' => 'floor', 'data_type' => 'VARCHAR(255)', 'display_column_name' => 'Этаж'],
+        ['column_name' => 'ip_number', 'data_type' => 'VARCHAR(255)', 'display_column_name' => 'IP номер'],
+        ['column_name' => 'name', 'data_type' => 'VARCHAR(255)', 'display_column_name' => 'Название'],
+        ['column_name' => 'landline_number', 'data_type' => 'VARCHAR(255)', 'display_column_name' => 'Городской номер'],
     ];
 
     foreach ($columns as $column) {
