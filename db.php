@@ -1,20 +1,23 @@
 <?php
 $host = 'localhost';
 $dbname = 'phone_directory';
-$username = 'root';  // Замените своими данными
+$username = 'root';  
 $password = 'root';
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+// Подключение к базе данных и создание необходимых таблиц, если их нет
 try {
     $pdo = new PDO("mysql:host=$host;charset=utf8mb4", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+    // Создание БД, если не существует
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbname` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `$dbname`");
 
+    // Список необходимых таблиц
     $requiredTables = ['users', 'table_metadata', 'column_metadata', 'quick_info', 'templates', 'template_columns'];
 
     foreach ($requiredTables as $table) {
@@ -36,17 +39,17 @@ try {
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
                 ");
                 break;
-                case 'column_metadata':
-                    $pdo->exec("
-                        CREATE TABLE IF NOT EXISTS column_metadata (
-                            table_name VARCHAR(255) NOT NULL,
-                            column_name VARCHAR(255) NOT NULL,
-                            display_column_name VARCHAR(255) NOT NULL,
-                            data_type VARCHAR(255) NOT NULL,
-                            PRIMARY KEY (table_name, column_name)
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-                    ");
-                    break;                
+            case 'column_metadata':
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS column_metadata (
+                        table_name VARCHAR(255) NOT NULL,
+                        column_name VARCHAR(255) NOT NULL,
+                        display_column_name VARCHAR(255) NOT NULL,
+                        data_type VARCHAR(255) NOT NULL,
+                        PRIMARY KEY (table_name, column_name)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                ");
+                break;
             case 'quick_info':
                 $pdo->exec("
                     CREATE TABLE IF NOT EXISTS quick_info (
@@ -78,6 +81,5 @@ try {
     }
 
 } catch (PDOException $e) {
-    die("Connection error: " . $e->getMessage());
+    die("Ошибка подключения: " . $e->getMessage());
 }
-?>

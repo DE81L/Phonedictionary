@@ -57,21 +57,8 @@
             <div class="modal-body">
                 <form id="modalForm" method="post">
                     <input type="hidden" name="id" id="recordId">
-                    <?php if ($columns): ?>
-                        <?php foreach ($columns as $col => $display_col): ?>
-                            <?php if ($col != 'id'): ?>
-                                <div class="mb-3">
-                                    <label class="form-label"><?= htmlspecialchars($display_col) ?>:</label>
-                                    <?php if ($current_table == 'users' && $col == 'password'): ?>
-                                        <input type="password" name="<?= $col ?>" class="form-control" required>
-                                    <?php else: ?>
-                                        <input type="text" name="<?= $col ?>" class="form-control" required>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                        <button type="submit" class="btn btn-success">Сохранить</button>
-                    <?php endif; ?>
+                    <!-- Колонки будут сформированы динамически -->
+                    <button type="submit" class="btn btn-success">Сохранить</button>
                 </form>
             </div>
         </div>
@@ -116,9 +103,9 @@
                         <li>Заголовок 4: <code>&lt;h4&gt;Текст&lt;/h4&gt;</code></li>
                         <li>Заголовок 5: <code>&lt;h5&gt;Текст&lt;/h5&gt;</code></li>
                         <li>Заголовок 6: <code>&lt;h6&gt;Текст&lt;/h6&gt;</code></li>
-                        <li>Цветной текст: <code>&lt;color:цвет&gt;Текст&lt;/color&gt;</code> (цвет может быть названием или HEX кодом)</li>
+                        <li>Цветной текст: <code>&lt;color:цвет&gt;Текст&lt;/color&gt;</code></li>
                         <li>Перенос строки: <code>&lt;br&gt;</code></li>
-                        <li>Изменение размера текста: <code>&lt;s:размер&gt;Текст&lt;/s&gt;</code> (размер в пикселях)</li>
+                        <li>Изменение размера текста: <code>&lt;s:размер&gt;Текст&lt;/s&gt;</code></li>
                     </ul>
                     <h5>Примеры:</h5>
                     <p><code>&lt;h1&gt;Большой заголовок&lt;/h1&gt;</code> будет отображаться как:</p>
@@ -131,13 +118,12 @@
     </div>
 </div>
 
-<!-- Create Table Modal -->
 <div id="tableModal" class="modal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5>Создать таблицу по шаблону</h5>
-                <button type="button" class="btn-close table-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                <button type="button" class="btn-close modal-close" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
                 <form id="tableForm" method="post" action="add_table.php">

@@ -2,11 +2,13 @@
 require 'db.php';
 session_start();
 
+// Проверка авторизации
 if (!isset($_SESSION['user'])) {
     header('Location: login.php');
     exit;
 }
 
+// Проверка необходимых параметров
 if (!isset($_GET['table']) || !isset($_GET['action'])) {
     die("Не указаны параметры.");
 }
@@ -14,6 +16,7 @@ if (!isset($_GET['table']) || !isset($_GET['action'])) {
 $table = $_GET['table'];
 $action = $_GET['action'];
 
+// Получение списка допустимых таблиц
 $allowed_tables = [];
 $stmt = $pdo->query("SELECT table_name FROM table_metadata");
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -25,6 +28,7 @@ if (!in_array($table, $allowed_tables)) {
     die("Недопустимая таблица.");
 }
 
+// Получаем колонки для таблицы
 $columns = [];
 if ($table == 'users') {
     $columns = [
@@ -39,12 +43,11 @@ if ($table == 'users') {
     }
 }
 
+// Функция валидации ввода
 function validate_input($value, $type) {
     if (strpos($type, 'INT') !== false) {
         return ctype_digit($value);
-    } elseif ($type == 'DATE') {
-        return (bool)strtotime($value);
-    } elseif ($type == 'DATETIME') {
+    } elseif ($type == 'DATE' || $type == 'DATETIME') {
         return (bool)strtotime($value);
     } elseif (strpos($type, 'VARCHAR') !== false || $type == 'TEXT') {
         return !empty($value);
@@ -52,6 +55,9 @@ function validate_input($value, $type) {
         return true;
     }
 }
+
+// Определяем текущую страницу для возврата
+$page = $_POST['page'] ?? '1';
 
 if ($action === 'add') {
     $fields = [];
@@ -76,7 +82,11 @@ if ($action === 'add') {
     $placeholders = implode(",", array_fill(0, count($values), "?"));
     $field_list = implode(",", $fields);
     $stmt = $pdo->prepare("INSERT INTO `$table` ($field_list) VALUES ($placeholders)");
-    $stmt->execute($values);
+    if ($stmt->execute($values)) {
+        echo json_encode(['success' => true, 'page' => $page]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Не удалось добавить запись']);
+    }
 } elseif ($action === 'edit') {
     if (!isset($_POST['id'])) {
         die("Не указан идентификатор записи.");
@@ -108,12 +118,12 @@ if ($action === 'add') {
     $values[] = $id;
     $field_list = implode(",", $fields);
     $stmt = $pdo->prepare("UPDATE `$table` SET $field_list WHERE id = ?");
-    $stmt->execute($values);
+    if ($stmt->execute($values)) {
+        echo json_encode(['success' => true, 'page' => $page]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Не удалось обновить запись']);
+    }
 } else {
     die("Недопустимое действие.");
 }
-
-header("Location: index.php?table=$table");
-exit;
 ?>
-<p><a href="index.php">Вернуться на главную страницу</a></p>

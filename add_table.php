@@ -2,6 +2,7 @@
 require 'db.php';
 session_start();
 
+// Проверка авторизации
 if (!isset($_SESSION['user'])) {
     header('Location: login.php');
     exit;
@@ -29,12 +30,14 @@ if (empty($display_table_name)) {
     error_and_back("Отображаемое имя таблицы не может быть пустым.");
 }
 
+// Проверка существования таблицы
 $stmt = $pdo->prepare("SHOW TABLES LIKE ?");
 $stmt->execute([$table_name]);
 if ($stmt->rowCount() > 0) {
     error_and_back("Таблица с именем '$table_name' уже существует.");
 }
 
+// Получаем структуру колонок из шаблона
 $stmt = $pdo->prepare("SELECT column_name, data_type, display_column_name FROM template_columns WHERE template_name = ?");
 $stmt->execute([$template_name]);
 $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);

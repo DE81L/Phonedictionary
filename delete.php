@@ -1,19 +1,25 @@
 <?php
-require 'db.php';
 session_start();
+require 'db.php';
 
+// Проверка авторизации
 if (!isset($_SESSION['user'])) {
-    header('Location: login.php');
+    echo json_encode(['success' => false, 'message' => 'Не авторизован']);
     exit;
 }
 
-if (!isset($_GET['table']) || !isset($_GET['id'])) {
-    die("Не указаны параметры.");
+// Получаем данные из запроса
+$data = json_decode(file_get_contents('php://input'), true);
+$id = $data['id'] ?? null;
+$table = $data['table'] ?? '';
+$page = $data['page'] ?? '1';
+
+if (!$id || !$table) {
+    echo json_encode(['success' => false, 'message' => 'Отсутствуют необходимые данные']);
+    exit;
 }
 
-$table = $_GET['table'];
-$id = (int)$_GET['id'];
-
+// Проверка существования таблицы
 $allowed_tables = [];
 $stmt = $pdo->query("SELECT table_name FROM table_metadata");
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -22,16 +28,17 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
 $allowed_tables[] = 'users';
 
 if (!in_array($table, $allowed_tables)) {
-    die("Недопустимая таблица.");
+    echo json_encode(['success' => false, 'message' => 'Недопустимая таблица']);
+    exit;
 }
 
-if ($table === 'users' && $id === 1) {
-    die("Нельзя удалить первую запись в таблице пользователей.");
+try {
+    $stmt = $pdo->prepare("DELETE FROM `$table` WHERE id = ?");
+    if ($stmt->execute([$id])) {
+        echo json_encode(['success' => true, 'page' => $page]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Не удалось удалить запись']);
+    }
+} catch (PDOException $e) {
+    echo json_encode(['success' => false, 'message' => 'Ошибка БД: ' . $e->getMessage()]);
 }
-
-$stmt = $pdo->prepare("DELETE FROM `$table` WHERE id = ?");
-$stmt->execute([$id]);
-
-header("Location: index.php?table=$table");
-exit;
-?>

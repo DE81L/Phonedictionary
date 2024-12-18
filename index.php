@@ -2,6 +2,7 @@
 session_start();
 require 'db.php';
 
+// Проверяем, существует ли шаблон 'standard_template'
 $stmt = $pdo->prepare("SELECT * FROM templates WHERE template_name = 'standard_template'");
 $stmt->execute();
 $template_exists = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -10,29 +11,27 @@ if (!$template_exists) {
     $pdo->prepare("INSERT INTO templates (template_name, display_template_name) VALUES (?, ?)")
         ->execute(['standard_template', 'Стандартный шаблон']);
 
-    $columns = [
+    $columns_def = [
         ['column_name' => 'floor', 'data_type' => 'VARCHAR(255)', 'display_column_name' => 'Этаж'],
         ['column_name' => 'ip_number', 'data_type' => 'VARCHAR(255)', 'display_column_name' => 'IP номер'],
         ['column_name' => 'name', 'data_type' => 'VARCHAR(255)', 'display_column_name' => 'Название'],
         ['column_name' => 'landline_number', 'data_type' => 'VARCHAR(255)', 'display_column_name' => 'Городской номер'],
     ];
 
-    foreach ($columns as $column) {
+    foreach ($columns_def as $column) {
         $pdo->prepare("INSERT INTO template_columns (template_name, column_name, data_type, display_column_name) VALUES (?, ?, ?, ?)")
             ->execute(['standard_template', $column['column_name'], $column['data_type'], $column['display_column_name']]);
     }
 }
 
+// Проверка существования администратора
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = 1");
 $stmt->execute();
 $admin_exists = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$admin_exists) {
-    $show_create_admin_modal = true;
-} else {
-    $show_create_admin_modal = false;
-}
+$show_create_admin_modal = !$admin_exists;
 
+// Получаем список таблиц
 $tables = [];
 $stmt = $pdo->query("SELECT table_name, display_table_name FROM table_metadata");
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -46,15 +45,11 @@ if (isset($_SESSION['user'])) {
 $current_table = isset($_GET['table']) ? $_GET['table'] : null;
 
 $stmt = $pdo->query("SELECT content FROM quick_info WHERE id = 1");
-$quick_info = $stmt->fetchColumn();
+$quick_info = $stmt->fetchColumn() ?: '';
 
-if (!$quick_info) {
-    $quick_info = '';
-}
-
+// Функция для обработки разметки
 function parseCustomMarkup($text) {
     $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
-
     $text = str_replace('&lt;br&gt;', '<br>', $text);
 
     for ($i = 1; $i <= 6; $i++) {
@@ -99,9 +94,20 @@ if ($current_table && isset($tables[$current_table])) {
         }
     }
 }
+
+// Пагинация - при первоначальной загрузке
+if ($current_table) {
+    $records_per_page = 50;
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $offset = ($page - 1) * $records_per_page;
+
+    $total_records_stmt = $pdo->query("SELECT COUNT(*) FROM `$current_table`");
+    $total_records = $total_records_stmt->fetchColumn();
+    $total_pages = ceil($total_records / $records_per_page);
+}
 ?>
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" class="sidebar-expanded">
 <head>
     <meta charset="UTF-8">
     <title>Телефонный справочник</title>
@@ -113,9 +119,13 @@ if ($current_table && isset($tables[$current_table])) {
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-current-table="<?= htmlspecialchars($current_table ?? '') ?>">
+<script>
+    var colNames = <?php echo json_encode(array_keys($columns ?? [])); ?>;
+    var actionColumn = <?php echo isset($_SESSION['user']) ? 'true' : 'false'; ?>;
+</script>
 <div class="container-fluid">
     <div class="row">
-        <aside class="col-md-3 bg-light sidebar p-3">
+        <aside class="sidebar p-3">
             <h2 class="text-success">Адресная книга</h2>
             <?php if (isset($_SESSION['user'])): ?>
                 <p>Вы вошли как <?= htmlspecialchars($_SESSION['user']) ?>. <a href="logout.php">Выйти</a></p>
@@ -145,7 +155,7 @@ if ($current_table && isset($tables[$current_table])) {
             <?php endif; ?>
         </aside>
 
-        <main class="col-md-9">
+        <main class="main-content">
             <div class="quick-info p-3 mb-4 rounded">
                 <h2>Информация</h2>
                 <p id="quickInfoText"><?= $quick_info_html ?></p>
@@ -156,15 +166,29 @@ if ($current_table && isset($tables[$current_table])) {
 
             <?php if ($current_table && isset($tables[$current_table])): ?>
                 <h1>Телефонный справочник: <?= htmlspecialchars($tables[$current_table]) ?></h1>
-
-                <input type="text" id="searchInput" class="form-control mb-3" placeholder="Поиск...">
+                
+                <!-- Блок для поиска -->
+                <div class="search-container mb-3">
+                    <div class="global-search mb-2">
+                        <input type="text" id="globalSearchInput" class="form-control" placeholder="Поиск по всей таблице...">
+                    </div>
+                    <div id="columnSearchContainer" class="mb-2" style="display:none;">
+                        <!-- Поля для поиска по столбцам будут добавляться динамически -->
+                    </div>
+                    <button id="applySearchBtn" class="btn btn-info">Поиск</button>
+                </div>
 
                 <div class="table-responsive">
-                    <table class="table table-bordered table-hover">
+                    <table class="table table-bordered table-hover" id="dataTable">
                         <thead class="table-light">
                             <tr>
+                                <th><input type="checkbox" id="selectAll"></th>
                                 <?php foreach ($columns as $col => $display_col): ?>
-                                    <th><?= htmlspecialchars($display_col) ?><div class="resizer"></div></th>
+                                    <th>
+                                        <?= htmlspecialchars($display_col) ?>
+                                        <i class="bi bi-search column-search-icon" data-column="<?= htmlspecialchars($col) ?>" style="cursor:pointer; margin-left:5px;"></i>
+                                        <div class="resizer"></div>
+                                    </th>
                                 <?php endforeach; ?>
                                 <?php if (isset($_SESSION['user'])): ?>
                                     <th>Действия</th>
@@ -173,32 +197,29 @@ if ($current_table && isset($tables[$current_table])) {
                         </thead>
                         <tbody>
                             <?php
-                            $stmt = $pdo->query("SELECT * FROM `$current_table`");
-                            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)):
+                            if ($current_table) {
+                                $stmt = $pdo->query("SELECT * FROM `$current_table` LIMIT $offset, $records_per_page");
+                                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)):
                             ?>
                                 <tr>
+                                    <td><input type="checkbox" class="record-checkbox" data-id="<?= $row['id']; ?>"></td>
                                     <?php foreach ($columns as $col => $display_col): ?>
                                         <td><?= htmlspecialchars($row[$col]) ?></td>
                                     <?php endforeach; ?>
                                     <?php if (isset($_SESSION['user'])): ?>
                                         <td>
                                             <?php
-                                            $disable_edit = false;
-                                            $disable_delete = false;
-
-                                            if ($current_table == 'users' && $row['id'] == 1) {
-                                                $disable_edit = true;
-                                                $disable_delete = true;
-                                            }
+                                            $disable_edit = ($current_table == 'users' && $row['id'] == 1);
+                                            $disable_delete = ($current_table == 'users' && $row['id'] == 1);
                                             ?>
-                                            <div class="btn-group" role="group" aria-label="Действия">
+                                            <div class="btn-group" role="group">
                                                 <?php if (!$disable_edit): ?>
-                                                    <button class="btn btn-sm btn-edit editBtn action-btn" data-id="<?= $row['id'] ?>">
+                                                    <button class="btn btn-sm btn-edit action-btn editBtn" data-id="<?= $row['id'] ?>">
                                                         <i class="bi bi-pencil-square"></i>
                                                     </button>
                                                 <?php endif; ?>
                                                 <?php if (!$disable_delete): ?>
-                                                    <button class="btn btn-sm btn-delete deleteBtn action-btn" data-id="<?= $row['id'] ?>">
+                                                    <button class="btn btn-sm btn-delete action-btn deleteBtn" data-id="<?= $row['id'] ?>">
                                                         <i class="bi bi-trash"></i>
                                                     </button>
                                                 <?php endif; ?>
@@ -206,10 +227,54 @@ if ($current_table && isset($tables[$current_table])) {
                                         </td>
                                     <?php endif; ?>
                                 </tr>
-                            <?php endwhile; ?>
+                            <?php endwhile; } ?>
                         </tbody>
                     </table>
                 </div>
+
+                <?php if ($current_table && $total_pages > 1): ?>
+                    <nav aria-label="Навигация по страницам" id="paginationNav">
+                        <ul class="pagination justify-content-center">
+                            <?php if ($page > 1): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="?table=<?= urlencode($current_table) ?>&page=<?= ($page - 1) ?>">Предыдущая</a>
+                                </li>
+                            <?php endif; ?>
+
+                            <?php
+                            $start_page = max(1, $page - 2);
+                            $end_page = min($total_pages, $page + 2);
+
+                            if ($start_page > 1) {
+                                echo '<li class="page-item"><a class="page-link" href="?table=' . urlencode($current_table) . '&page=1">1</a></li>';
+                                if ($start_page > 2) {
+                                    echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                                }
+                            }
+
+                            for ($i = $start_page; $i <= $end_page; $i++) {
+                                echo '<li class="page-item ' . ($i == $page ? 'active' : '') . '">';
+                                echo '<a class="page-link" href="?table=' . urlencode($current_table) . '&page=' . $i . '">' . $i . '</a>';
+                                echo '</li>';
+                            }
+
+                            if ($end_page < $total_pages) {
+                                if ($end_page < $total_pages - 1) {
+                                    echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                                }
+                                echo '<li class="page-item"><a class="page-link" href="?table=' . urlencode($current_table) . '&page=' . $total_pages . '">' . $total_pages . '</a></li>';
+                            }
+                            ?>
+
+                            <?php if ($page < $total_pages): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="?table=<?= urlencode($current_table) ?>&page=<?= ($page + 1) ?>">Следующая</a>
+                                </li>
+                            <?php endif; ?>
+                        </ul>
+                    </nav>
+                <?php endif; ?>
+
             <?php else: ?>
                 <h1>Телефонный справочник</h1>
                 <p>Выберите таблицу из списка или создайте новую.</p>
@@ -219,6 +284,18 @@ if ($current_table && isset($tables[$current_table])) {
 </div>
 
 <?php include 'modals.php'; ?>
+
+<div class="floating-buttons">
+    <!-- Кнопка скрытия/показа боковой панели -->
+    <button id="floatingSidebarToggleBtn" class="float-btn">
+        <i class="bi bi-layout-sidebar-inset"></i>
+    </button>
+    <!-- Кнопка удаления записей -->
+    <button id="floatingDeleteBtn" class="float-btn" style="display:none;">
+        <i class="bi bi-trash-fill"></i>
+    </button>
+</div>
+
 
 <script
     src="https://code.jquery.com/jquery-3.6.0.min.js"

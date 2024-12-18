@@ -2,6 +2,7 @@
 require 'db.php';
 session_start();
 
+// Проверка авторизации
 if (!isset($_SESSION['user'])) {
     header('Location: login.php');
     exit;
@@ -44,6 +45,7 @@ foreach ($columns as $index => $column) {
     if (!isset($column['column_name'], $column['data_type'], $column['display_column_name'])) {
         error_and_back("Не все данные для колонки указаны. Проверьте ввод для колонки №" . ($index + 1) . ".");
     }
+
     $column_name = $column['column_name'];
     $data_type = $column['data_type'];
     $display_column_name = $column['display_column_name'];
